@@ -9,6 +9,7 @@ import { getArgentinaNow, getWeekCutoff, getWeekRange, toDateKey } from "@/lib/w
 type PlayerWeeklyTotal = {
   id: string;
   name: string;
+  teamName: string | null;
   totalMinutes: number;
 };
 
@@ -59,7 +60,7 @@ export default function Leaderboard({ refreshKey }: Props) {
 
       const { data } = await supabase
         .from("daily_logs")
-        .select("player_id, minutes_logged, players(name)")
+        .select("player_id, minutes_logged, players(name, team_name)")
         .gte("log_date", range.start)
         .lte("log_date", range.end);
 
@@ -68,17 +69,19 @@ export default function Leaderboard({ refreshKey }: Props) {
       const totals = new Map<string, PlayerWeeklyTotal>();
       for (const row of data ?? []) {
         const minutes = row.minutes_logged ?? 0;
-        const playersRelation = row.players as { name?: string }[] | { name?: string } | null;
-        const playerName = Array.isArray(playersRelation)
-          ? playersRelation[0]?.name
-          : playersRelation?.name;
+        const playersRelation = row.players as
+          | { name?: string; team_name?: string }[]
+          | { name?: string; team_name?: string }
+          | null;
+        const playerInfo = Array.isArray(playersRelation) ? playersRelation[0] : playersRelation;
         const existing = totals.get(row.player_id);
         if (existing) {
           existing.totalMinutes += minutes;
         } else {
           totals.set(row.player_id, {
             id: row.player_id,
-            name: playerName ?? "Jugador",
+            name: playerInfo?.name ?? "Jugador",
+            teamName: playerInfo?.team_name ?? null,
             totalMinutes: minutes,
           });
         }
@@ -156,7 +159,12 @@ export default function Leaderboard({ refreshKey }: Props) {
                 <span className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
                   <span className="font-semibold text-zinc-400">#{index + 1}</span>
                   {isEliminated && <Skull className="h-4 w-4" />}
-                  {player.name}
+                  <span className="flex flex-col">
+                    <span>{player.name}</span>
+                    <span className="text-xs font-normal text-zinc-400 dark:text-zinc-500">
+                      {player.teamName ?? "Sin equipo"}
+                    </span>
+                  </span>
                 </span>
                 <span className="text-zinc-500 dark:text-zinc-400">
                   {isEliminated ? "Eliminado" : formatMinutesToTime(player.totalMinutes)}

@@ -9,6 +9,7 @@ import { formatMinutesToTime } from "@/lib/utils";
 type PlayerDailyStatus = {
   id: string;
   name: string;
+  teamName: string | null;
   hasUploadedToday: boolean;
   minutesLogged: number | null;
 };
@@ -31,7 +32,7 @@ export default function DailyStatus({ refreshKey }: Props) {
 
       const { data } = await supabase
         .from("players")
-        .select("id, name, daily_logs!left(minutes_logged, log_date)")
+        .select("id, name, team_name, daily_logs!left(minutes_logged, log_date)")
         .eq("daily_logs.log_date", logDate)
         .order("name");
 
@@ -42,6 +43,7 @@ export default function DailyStatus({ refreshKey }: Props) {
         return {
           id: row.id,
           name: row.name,
+          teamName: row.team_name ?? null,
           hasUploadedToday: Boolean(log),
           minutesLogged: log?.minutes_logged ?? null,
         };
@@ -80,7 +82,12 @@ export default function DailyStatus({ refreshKey }: Props) {
                 key={player.id}
                 className="flex items-center justify-between py-3 text-sm text-zinc-800 dark:text-zinc-200"
               >
-                <span>{player.name}</span>
+                <span className="flex flex-col">
+                  <span>{player.name}</span>
+                  <span className="text-xs font-normal text-zinc-400 dark:text-zinc-500">
+                    {player.teamName ?? "Sin equipo"}
+                  </span>
+                </span>
                 {isCurrentUser && player.hasUploadedToday ? (
                   <span className="flex items-center gap-2 text-green-600 dark:text-green-400">
                     <CheckCircle2 className="h-5 w-5" />
