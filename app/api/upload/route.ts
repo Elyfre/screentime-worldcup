@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { supabase } from "@/lib/supabase";
 import { analyzeScreenTimeImage } from "@/lib/gemini";
+import { getArgentinaNow, getWeekRange, toDateKey } from "@/lib/week";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +10,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file");
     const playerId = formData.get("playerId");
     const manualMinutesRaw = formData.get("manualMinutes");
+    const logDateRaw = formData.get("logDate");
 
     if (!(file instanceof File) || typeof playerId !== "string" || !playerId) {
       return NextResponse.json(
@@ -16,6 +18,26 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    if (typeof logDateRaw !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(logDateRaw)) {
+      return NextResponse.json(
+        { error: "Se requiere 'logDate' (dia al que corresponde la captura)." },
+        { status: 400 }
+      );
+    }
+
+    const argentinaNow = getArgentinaNow();
+    const todayKey = toDateKey(argentinaNow);
+    const weekRange = getWeekRange(argentinaNow);
+
+    if (logDateRaw > todayKey || logDateRaw < weekRange.start) {
+      return NextResponse.json(
+        { error: "El dia seleccionado no es valido para esta semana." },
+        { status: 400 }
+      );
+    }
+
+    const logDate = logDateRaw;
 
     const manualMinutes = Math.max(0, Number(manualMinutesRaw) || 0);
 
@@ -43,28 +65,30 @@ export async function POST(request: NextRequest) {
     );
     const minutesLogged = minutesFromScreenshot + manualMinutes;
 
-    // Zona horaria fija en Argentina: evita que el "día" cambie según la hora UTC del servidor.
-    const logDate = new Date().toLocaleDateString("en-CA", {
-      timeZone: "America/Argentina/Buenos_Aires",
-    });
-
-    const { data: dailyLog, error: upsertError } = await supabase
+    const { data: dailyLog, error: insertError } = await supabase
       .from("daily_logs")
-      .upsert(
-        {
-          player_id: playerId,
-          log_date: logDate,
-          screenshot_url: publicUrl,
-          minutes_logged: minutesLogged,
-        },
-        { onConflict: "player_id,log_date" }
-      )
+      .insert({
+        player_id: playerId,
+        log_date: logDate,
+        screenshot_url: publicUrl,
+        minutes_logged: minutesLogged,
+      })
       .select()
       .single();
 
-    if (upsertError) {
-      console.error("[/api/upload] Supabase daily_logs upsert error:", upsertError);
-      return NextResponse.json({ error: upsertError.message }, { status: 500 });
+    if (insertError) {
+      // 23505 = unique_violation (constraint daily_logs_player_id_log_date_key).
+      if (insertError.code === "23505") {
+        return NextResponse.json(
+          {
+            error:
+              "Ya subiste una captura para ese día. Si necesitás corregirla, pedile a un admin que la borre en el Panel de Admin.",
+          },
+          { status: 409 }
+        );
+      }
+      console.error("[/api/upload] Supabase daily_logs insert error:", insertError);
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, dailyLog });

@@ -59,3 +59,37 @@ export function getWeekRange(now: Date): { start: string; end: string } {
 
   return { start: toDateKey(monday), end: toDateKey(sunday) };
 }
+
+const DAY_LABELS = [
+  "Domingo",
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado",
+];
+
+/**
+ * Días elegibles para subir captura: de lunes de la semana actual hasta `now`
+ * inclusive (nunca días futuros, para que nadie cargue un día que todavía no pasó).
+ */
+export function getSelectableDays(now: Date): { value: string; label: string }[] {
+  const { start } = getWeekRange(now);
+  const [year, month, day] = start.split("-").map(Number);
+  const monday = new Date(year, month - 1, day);
+  const todayKey = toDateKey(now);
+
+  const days: { value: string; label: string }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    const value = toDateKey(date);
+    if (value > todayKey) break;
+    days.push({
+      value,
+      label: `${DAY_LABELS[date.getDay()]} ${pad(date.getDate())}/${pad(date.getMonth() + 1)}`,
+    });
+  }
+  return days;
+}

@@ -30,3 +30,11 @@ create table if not exists chat_messages (
 -- Migración para bases de datos ya existentes (creadas antes de que
 -- team_name fuera unique en el create table de arriba):
 -- alter table players add constraint players_team_name_key unique (team_name);
+
+-- Migración: constraint único que impide mas de una captura por jugador/día.
+-- alter table daily_logs add constraint daily_logs_player_id_log_date_key unique (player_id, log_date);
+
+-- No hay upsert: /api/upload hace un insert simple y, si ya existe una fila
+-- para ese jugador/día, el constraint único la rechaza (23505) y el usuario
+-- ve un mensaje pidiendo que un admin borre la captura anterior si hace falta
+-- corregirla (ver boton "Eliminar" del Panel de Admin).

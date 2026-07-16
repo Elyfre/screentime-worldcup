@@ -126,12 +126,8 @@ export default function Leaderboard({ refreshKey }: Props) {
   }
 
   const sortedRanking = [...ranking].sort((a, b) => a.totalMinutes - b.totalMinutes);
-  const eliminatedId =
-    sortedRanking.length > 0
-      ? sortedRanking.reduce((max, player) =>
-          player.totalMinutes > max.totalMinutes ? player : max
-        ).id
-      : null;
+  // Los 2 con MAS tiempo (el final del array, ya ordenado ascendente) quedan eliminados.
+  const eliminatedIds = new Set(sortedRanking.slice(-2).map((player) => player.id));
 
   return (
     <div className="w-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -149,7 +145,7 @@ export default function Leaderboard({ refreshKey }: Props) {
       ) : (
         <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-800">
           {sortedRanking.map((player, index) => {
-            const isEliminated = player.id === eliminatedId;
+            const isEliminated = eliminatedIds.has(player.id);
             return (
               <li
                 key={player.id}

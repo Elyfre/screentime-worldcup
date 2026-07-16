@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldCheck, Save, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { ShieldCheck, Save, Trash2, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatMinutesToTime } from "@/lib/utils";
 import { getArgentinaNow, getWeekRange } from "@/lib/week";
@@ -102,6 +102,48 @@ export default function AdminPanel() {
     }
   }
 
+  async function handleDelete(logId: string) {
+    if (!adminSecret) {
+      setSaveStates((prev) => ({ ...prev, [logId]: "error" }));
+      return;
+    }
+
+    if (!window.confirm("¿Borrar esta captura? Esta accion no se puede deshacer.")) {
+      return;
+    }
+
+    setSaveStates((prev) => ({ ...prev, [logId]: "saving" }));
+
+    try {
+      const response = await fetch("/api/admin", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-secret": adminSecret,
+        },
+        body: JSON.stringify({ log_id: logId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("No se pudo borrar.");
+      }
+
+      setLogs((prev) => prev.filter((log) => log.id !== logId));
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[logId];
+        return next;
+      });
+      setSaveStates((prev) => {
+        const next = { ...prev };
+        delete next[logId];
+        return next;
+      });
+    } catch {
+      setSaveStates((prev) => ({ ...prev, [logId]: "error" }));
+    }
+  }
+
   return (
     <div className="w-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
@@ -169,6 +211,15 @@ export default function AdminPanel() {
                       <Save className="h-3 w-3" />
                     )}
                     Guardar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(log.id)}
+                    disabled={saveState === "saving"}
+                    className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Eliminar
                   </button>
                   {saveState === "saved" && (
                     <CheckCircle2 className="h-4 w-4 text-green-500" />

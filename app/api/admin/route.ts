@@ -37,3 +37,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const providedSecret = request.headers.get("x-admin-secret");
+    if (!providedSecret || providedSecret !== process.env.ADMIN_SECRET) {
+      return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { log_id: logId } = body;
+
+    if (typeof logId !== "string" || !logId) {
+      return NextResponse.json({ error: "Se requiere 'log_id' (string)." }, { status: 400 });
+    }
+
+    const { error } = await supabase.from("daily_logs").delete().eq("id", logId);
+
+    if (error) {
+      console.error("[/api/admin] Supabase daily_logs delete error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[/api/admin] Unhandled error:", error);
+    const message = error instanceof Error ? error.message : "Error desconocido.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

@@ -5,6 +5,7 @@ import { CalendarCheck, CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getStoredPlayer } from "@/lib/player";
 import { formatMinutesToTime } from "@/lib/utils";
+import { getArgentinaNow, toDateKey } from "@/lib/week";
 
 type PlayerDailyStatus = {
   id: string;
@@ -28,7 +29,7 @@ export default function DailyStatus({ refreshKey }: Props) {
 
     async function fetchDailyStatus() {
       const currentPlayer = getStoredPlayer();
-      const logDate = new Date().toLocaleDateString("en-CA");
+      const logDate = toDateKey(getArgentinaNow());
 
       const { data } = await supabase
         .from("players")
