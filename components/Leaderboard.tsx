@@ -66,28 +66,29 @@ export default function Leaderboard({ refreshKey }: Props) {
 
       if (!isCurrent) return;
 
-      const totals = new Map<string, PlayerWeeklyTotal>();
-      for (const row of data ?? []) {
+      const totals = (data ?? []).reduce<Record<string, PlayerWeeklyTotal>>((acc, row) => {
         const minutes = row.minutes_logged ?? 0;
         const playersRelation = row.players as
           | { name?: string; team_name?: string }[]
           | { name?: string; team_name?: string }
           | null;
         const playerInfo = Array.isArray(playersRelation) ? playersRelation[0] : playersRelation;
-        const existing = totals.get(row.player_id);
-        if (existing) {
-          existing.totalMinutes += minutes;
+        const key = row.player_id;
+
+        if (acc[key]) {
+          acc[key].totalMinutes += minutes;
         } else {
-          totals.set(row.player_id, {
-            id: row.player_id,
+          acc[key] = {
+            id: key,
             name: playerInfo?.name ?? "Jugador",
             teamName: playerInfo?.team_name ?? null,
             totalMinutes: minutes,
-          });
+          };
         }
-      }
+        return acc;
+      }, {});
 
-      setRanking(Array.from(totals.values()));
+      setRanking(Object.values(totals));
       setIsLoadingRanking(false);
     }
 

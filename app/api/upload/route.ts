@@ -48,31 +48,23 @@ export async function POST(request: NextRequest) {
       timeZone: "America/Argentina/Buenos_Aires",
     });
 
-    const { error: deleteError } = await supabase
+    const { data: dailyLog, error: upsertError } = await supabase
       .from("daily_logs")
-      .delete()
-      .eq("player_id", playerId)
-      .eq("log_date", logDate);
-
-    if (deleteError) {
-      console.error("[/api/upload] Supabase daily_logs delete error:", deleteError);
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
-    }
-
-    const { data: dailyLog, error: insertError } = await supabase
-      .from("daily_logs")
-      .insert({
-        player_id: playerId,
-        log_date: logDate,
-        screenshot_url: publicUrl,
-        minutes_logged: minutesLogged,
-      })
+      .upsert(
+        {
+          player_id: playerId,
+          log_date: logDate,
+          screenshot_url: publicUrl,
+          minutes_logged: minutesLogged,
+        },
+        { onConflict: "player_id,log_date" }
+      )
       .select()
       .single();
 
-    if (insertError) {
-      console.error("[/api/upload] Supabase daily_logs insert error:", insertError);
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    if (upsertError) {
+      console.error("[/api/upload] Supabase daily_logs upsert error:", upsertError);
+      return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, dailyLog });
