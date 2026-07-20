@@ -21,6 +21,7 @@ import {
   getArgentinaNow,
   getWeekRange,
   shiftDateByWeeks,
+  toDateKey,
   getWeekDays,
   formatDayLabel,
 } from "@/lib/week";
@@ -82,6 +83,11 @@ export default function AdminPanel() {
   const weekDays = useMemo(() => getWeekDays(weekRange.start), [weekRange]);
   const isCurrentWeek = weekOffset === 0;
   const canGoNext = weekOffset < 0;
+  const todayKey = toDateKey(now);
+  // Para "pendientes" no tiene sentido avisar de dias que todavia no pasaron.
+  const relevantWeekDays = isCurrentWeek
+    ? weekDays.filter((day) => day <= todayKey)
+    : weekDays;
   const manualDay =
     manualDayOverride && weekDays.includes(manualDayOverride)
       ? manualDayOverride
@@ -299,7 +305,7 @@ export default function AdminPanel() {
     .map((player) => {
       const group = groups.find((g) => g.playerId === player.id);
       const loggedDates = new Set((group?.entries ?? []).map((entry) => entry.logDate));
-      const missingDays = weekDays.filter((day) => !loggedDates.has(day));
+      const missingDays = relevantWeekDays.filter((day) => !loggedDates.has(day));
       return { player, missingDays };
     })
     .filter(({ missingDays }) => missingDays.length > 0);
