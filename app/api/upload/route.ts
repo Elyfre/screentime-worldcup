@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { supabase } from "@/lib/supabase";
 import { analyzeScreenTimeImage } from "@/lib/gemini";
-import { getArgentinaNow, getWeekRange, toDateKey } from "@/lib/week";
+import { getArgentinaNow, getPreviousWeekRange, getWeekRange, toDateKey } from "@/lib/week";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,15 +29,40 @@ export async function POST(request: NextRequest) {
     const argentinaNow = getArgentinaNow();
     const todayKey = toDateKey(argentinaNow);
     const weekRange = getWeekRange(argentinaNow);
+    const previousWeekRange = getPreviousWeekRange(argentinaNow);
 
-    if (logDateRaw > todayKey || logDateRaw < weekRange.start) {
+    // Se permite la semana actual (hasta hoy) y la semana anterior completa,
+    // para poder cargar dias que quedaron pendientes al arrancar la semana nueva.
+    const isInCurrentWeek = logDateRaw <= todayKey && logDateRaw >= weekRange.start;
+    const isInPreviousWeek =
+      logDateRaw >= previousWeekRange.start && logDateRaw <= previousWeekRange.end;
+
+    if (!isInCurrentWeek && !isInPreviousWeek) {
       return NextResponse.json(
-        { error: "El dia seleccionado no es valido para esta semana." },
+        { error: "El dia seleccionado no es valido." },
         { status: 400 }
       );
     }
 
     const logDate = logDateRaw;
+
+    const { data: playerRow, error: playerError } = await supabase
+      .from("players")
+      .select("is_eliminated")
+      .eq("id", playerId)
+      .maybeSingle();
+
+    if (playerError) {
+      console.error("[/api/upload] Supabase players lookup error:", playerError);
+      return NextResponse.json({ error: playerError.message }, { status: 500 });
+    }
+
+    if (playerRow?.is_eliminated) {
+      return NextResponse.json(
+        { error: "Fuiste eliminado, ya no podés subir capturas." },
+        { status: 403 }
+      );
+    }
 
     const manualMinutes = Math.max(0, Number(manualMinutesRaw) || 0);
 

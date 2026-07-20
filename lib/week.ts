@@ -70,26 +70,48 @@ const DAY_LABELS = [
   "Sábado",
 ];
 
+/** Corre `date` `weeks` semanas hacia adelante (o atrás, si es negativo). */
+export function shiftDateByWeeks(date: Date, weeks: number): Date {
+  const shifted = new Date(date);
+  shifted.setDate(shifted.getDate() + weeks * 7);
+  return shifted;
+}
+
+/** Rango lunes-domingo de la semana anterior a la que cae `now`. */
+export function getPreviousWeekRange(now: Date): { start: string; end: string } {
+  return getWeekRange(shiftDateByWeeks(now, -1));
+}
+
+/** Parsea una clave 'YYYY-MM-DD' a Date local (evita corrimientos de timezone). */
+export function parseDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/** Las 7 fechas ('YYYY-MM-DD') lunes-domingo de la semana que empieza en `weekStartKey`. */
+export function getWeekDays(weekStartKey: string): string[] {
+  const monday = parseDateKey(weekStartKey);
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    return toDateKey(date);
+  });
+}
+
+export function formatDayLabel(dateKey: string): string {
+  const date = parseDateKey(dateKey);
+  return `${DAY_LABELS[date.getDay()]} ${pad(date.getDate())}/${pad(date.getMonth() + 1)}`;
+}
+
 /**
  * Días elegibles para subir captura: de lunes de la semana actual hasta `now`
  * inclusive (nunca días futuros, para que nadie cargue un día que todavía no pasó).
  */
 export function getSelectableDays(now: Date): { value: string; label: string }[] {
   const { start } = getWeekRange(now);
-  const [year, month, day] = start.split("-").map(Number);
-  const monday = new Date(year, month - 1, day);
   const todayKey = toDateKey(now);
 
-  const days: { value: string; label: string }[] = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + i);
-    const value = toDateKey(date);
-    if (value > todayKey) break;
-    days.push({
-      value,
-      label: `${DAY_LABELS[date.getDay()]} ${pad(date.getDate())}/${pad(date.getMonth() + 1)}`,
-    });
-  }
-  return days;
+  return getWeekDays(start)
+    .filter((value) => value <= todayKey)
+    .map((value) => ({ value, label: formatDayLabel(value) }));
 }

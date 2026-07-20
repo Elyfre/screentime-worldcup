@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Upload, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, XCircle, AlertTriangle, Skull } from "lucide-react";
 import { getStoredPlayer } from "@/lib/player";
 import { formatMinutesToTime } from "@/lib/utils";
-import { getArgentinaNow, getSelectableDays } from "@/lib/week";
+import {
+  getArgentinaNow,
+  getSelectableDays,
+  getPreviousWeekRange,
+  getWeekDays,
+  formatDayLabel,
+} from "@/lib/week";
 import { supabase } from "@/lib/supabase";
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -33,21 +39,69 @@ type Props = {
 };
 
 export default function UploadForm({ onUploadSuccess }: Props) {
-  const selectableDays = useMemo(() => getSelectableDays(getArgentinaNow()), []);
+  const now = useMemo(() => getArgentinaNow(), []);
+  const currentWeekDays = useMemo(() => getSelectableDays(now), [now]);
+  const previousWeekDays = useMemo(() => {
+    const range = getPreviousWeekRange(now);
+    return getWeekDays(range.start).map((value) => ({
+      value,
+      label: `${formatDayLabel(value)} (semana pasada)`,
+    }));
+  }, [now]);
+  const selectableDays = useMemo(
+    () => [...previousWeekDays, ...currentWeekDays],
+    [previousWeekDays, currentWeekDays]
+  );
+
   const [file, setFile] = useState<File | null>(null);
   const [manualMinutes, setManualMinutes] = useState(0);
   const [logDate, setLogDate] = useState(
-    () => selectableDays[selectableDays.length - 1]?.value ?? ""
+    () => currentWeekDays[currentWeekDays.length - 1]?.value ?? ""
   );
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
   const [playerId, setPlayerId] = useState<string | null>(null);
+  const [isEliminated, setIsEliminated] = useState<boolean | null>(null);
   const [existingMinutes, setExistingMinutes] = useState<number | null>(null);
   const [isCheckingExisting, setIsCheckingExisting] = useState(true);
+  const [missingDayLabels, setMissingDayLabels] = useState<string[]>([]);
 
   useEffect(() => {
     setPlayerId(getStoredPlayer()?.id ?? null);
   }, []);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function fetchPlayerStatus() {
+      if (!playerId) return;
+
+      const [{ data: playerRow }, { data: loggedRows }] = await Promise.all([
+        supabase.from("players").select("is_eliminated").eq("id", playerId).maybeSingle(),
+        supabase
+          .from("daily_logs")
+          .select("log_date")
+          .eq("player_id", playerId)
+          .gte("log_date", previousWeekDays[0]?.value ?? "")
+          .lte("log_date", currentWeekDays[currentWeekDays.length - 1]?.value ?? ""),
+      ]);
+
+      if (!isCurrent) return;
+
+      setIsEliminated(Boolean(playerRow?.is_eliminated));
+
+      const loggedDates = new Set((loggedRows ?? []).map((row) => row.log_date));
+      const allRelevantDays = [...previousWeekDays, ...currentWeekDays];
+      const missing = allRelevantDays.filter((day) => !loggedDates.has(day.value));
+      setMissingDayLabels(missing.map((day) => day.label));
+    }
+
+    fetchPlayerStatus();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [playerId, previousWeekDays, currentWeekDays, status]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -139,11 +193,34 @@ export default function UploadForm({ onUploadSuccess }: Props) {
     }
   }
 
+  if (isEliminated) {
+    return (
+      <div className="w-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          <Skull className="h-4 w-4" />
+          Fuiste eliminado
+        </h2>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Ya no podés subir más capturas, pero podés seguir viendo el progreso y el ranking de
+          los demás.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
         Sube tu captura
       </h2>
+
+      {missingDayLabels.length > 0 && (
+        <p className="mb-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>Te falta cargar: {missingDayLabels.join(", ")}.</span>
+        </p>
+      )}
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <label

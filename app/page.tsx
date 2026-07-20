@@ -9,6 +9,7 @@ import LiveChat from "@/components/LiveChat";
 import Onboarding from "@/components/Onboarding";
 import AdminPanel from "@/components/AdminPanel";
 import { getStoredPlayer, type Player } from "@/lib/player";
+import { processCompletedWeeks } from "@/lib/tournament";
 
 type Tab = "progress" | "leaderboard";
 type View = "dashboard" | "admin";
@@ -24,6 +25,12 @@ export default function Home() {
   useEffect(() => {
     const timeout = setTimeout(() => setPlayer(getStoredPlayer()), 0);
     return () => clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
+    // Sin cron disponible: cada carga de la app es una oportunidad de
+    // detectar que una semana quedó completa y cerrarla automáticamente.
+    processCompletedWeeks();
   }, []);
 
   if (player === undefined) {
