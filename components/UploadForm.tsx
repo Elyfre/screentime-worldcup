@@ -82,7 +82,7 @@ export default function UploadForm({ onUploadSuccess }: Props) {
           .from("daily_logs")
           .select("log_date")
           .eq("player_id", playerId)
-          .gte("log_date", previousWeekDays[0]?.value ?? "")
+          .gte("log_date", currentWeekDays[0]?.value ?? "")
           .lte("log_date", currentWeekDays[currentWeekDays.length - 1]?.value ?? ""),
       ]);
 
@@ -90,9 +90,10 @@ export default function UploadForm({ onUploadSuccess }: Props) {
 
       setIsEliminated(Boolean(playerRow?.is_eliminated));
 
+      // El recordatorio solo avisa de la semana actual; la semana anterior
+      // sigue disponible en el selector como catch-up, pero sin nagging.
       const loggedDates = new Set((loggedRows ?? []).map((row) => row.log_date));
-      const allRelevantDays = [...previousWeekDays, ...currentWeekDays];
-      const missing = allRelevantDays.filter((day) => !loggedDates.has(day.value));
+      const missing = currentWeekDays.filter((day) => !loggedDates.has(day.value));
       setMissingDayLabels(missing.map((day) => day.label));
     }
 
@@ -101,7 +102,7 @@ export default function UploadForm({ onUploadSuccess }: Props) {
     return () => {
       isCurrent = false;
     };
-  }, [playerId, previousWeekDays, currentWeekDays, status]);
+  }, [playerId, currentWeekDays, status]);
 
   useEffect(() => {
     let isCurrent = true;

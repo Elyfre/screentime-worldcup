@@ -485,12 +485,13 @@ export default function AdminPanel() {
             className="rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           >
             <option value="">Jugador...</option>
-            {roster.map((player) => (
-              <option key={player.id} value={player.id}>
-                {player.name}
-                {player.isEliminated ? " (eliminado)" : ""}
-              </option>
-            ))}
+            {roster
+              .filter((player) => !player.isEliminated)
+              .map((player) => (
+                <option key={player.id} value={player.id}>
+                  {player.name}
+                </option>
+              ))}
           </select>
 
           <select

@@ -233,7 +233,7 @@ export default function Leaderboard({ refreshKey }: Props) {
                   </span>
                 </span>
                 <span className="text-zinc-500 dark:text-zinc-400">
-                  {isEliminated ? "Eliminado" : formatMinutesToTime(player.totalMinutes)}
+                  {formatMinutesToTime(player.totalMinutes)}
                 </span>
               </li>
             );
